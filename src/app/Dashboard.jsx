@@ -1,10 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ControlPanel from '../components/ControlPanel';
 
 export default function Dashboard() {
   return (
-    <View style={styles.screen}>
-      <Text style={styles.text}>Hello User</Text>
-    </View>
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.content}>
+        <Text style={styles.text}>Hello User</Text>
+      </View>
+      <ControlPanel />
+    </SafeAreaView>
   );
 }
 
@@ -12,8 +17,11 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#1C1C1E',
-    alignItems: 'center',
-    justifyContent: 'center',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   text: {
     color: '#FFFFFF',
