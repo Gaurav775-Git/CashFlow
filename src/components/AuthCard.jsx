@@ -26,7 +26,7 @@ export default function AuthCard() {
         <Text style={styles.buttonText}>Login</Text>
       </Pressable>
 
-      <Pressable onPress={() => router.replace('/Dashboard')}>
+      <Pressable onPress={() => router.replace('/Permission')}>
         <Text style={styles.skipbtn}>Skip</Text>
       </Pressable>
     </View>
