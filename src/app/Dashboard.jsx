@@ -16,7 +16,7 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#A78BFA',
   },
   content: {
     flex: 1,

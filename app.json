@@ -8,7 +8,8 @@
     "scheme": "cashflow",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.anonymous.CashFlow"
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +34,8 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-sms-listener"
     ],
     "experiments": {
       "typedRoutes": true,
