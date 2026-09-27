@@ -47,7 +47,7 @@ export default function Permission() {
   };
 
   const handleNotNow = () => {
-    router.replace('/');
+    router.replace('/Dashboard');
   };
 
   return (

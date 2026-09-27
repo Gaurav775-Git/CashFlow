@@ -1,13 +1,30 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ControlPanel from '../components/ControlPanel';
+import TransactionHistory from '../components/TransactionHistory';
+import { fetchInboxMessages } from '../service/smsReader';
 
 export default function Dashboard() {
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      const data = await fetchInboxMessages();
+      setMessages(data);
+    })();
+  }, []);
+
   return (
     <SafeAreaView style={styles.screen}>
-      <View style={styles.content}>
-        <Text style={styles.text}>Hello User</Text>
-      </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.text}>Payment Messages</Text>
+        <TransactionHistory messages={messages} />
+      </ScrollView>
       <ControlPanel />
     </SafeAreaView>
   );
@@ -16,16 +33,20 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#A78BFA',
+    backgroundColor: '#F5F5F7',
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
-    flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+    paddingBottom: 20,
   },
   text: {
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
+    marginBottom: 16,
   },
 });
