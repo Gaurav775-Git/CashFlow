@@ -40,7 +40,7 @@ export default function Permission() {
     const { granted } = await requestSmsPermissionAsync();
     if (granted) {
       await startSmsListenerServiceAsync();
-      router.replace('/dashboard');
+      router.replace('/Dashboard');
     } else {
       setStatus('denied');
     }
