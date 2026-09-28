@@ -12,11 +12,14 @@ export function parseTransaction(sms) {
   if (OTP.test(body)) return null;
   if (!FINANCE.test(body) || !AMOUNT.test(body)) return null;
 
+  const amount = Number(body.match(AMOUNT)[0].replace(/[^\d.]/g, ''));
+
   return {
     id: String(sms._id ?? `${sms.address}-${sms.date}`),
     sender: sms.address,
     body,
     date: Number(sms.date) || Date.now(),
+    amount,
   };
 }
 

@@ -1,0 +1,99 @@
+diff --git a/node_modules/react-native-get-sms-android/android/build.gradle b/node_modules/react-native-get-sms-android/android/build.gradle
+index 0de40fc..1164e07 100644
+--- a/node_modules/react-native-get-sms-android/android/build.gradle
++++ b/node_modules/react-native-get-sms-android/android/build.gradle
+@@ -2,11 +2,11 @@
+ buildscript {
+     repositories {
+         google()
+-        jcenter()
++        mavenCentral()
+     }
+ 
+     dependencies {
+-        classpath 'com.android.tools.build:gradle:3.3.1'
++        classpath 'com.android.tools.build:gradle:8.7.3'
+     }
+ }
+ 
+@@ -17,29 +17,26 @@ def safeExtGet(prop, fallback) {
+ }
+ 
+ android {
+-    compileSdkVersion safeExtGet('compileSdkVersion', 28)
++    namespace 'com.react'
++    compileSdk safeExtGet('compileSdkVersion', 36)
+ 
+     defaultConfig {
+-        minSdkVersion safeExtGet('minSdkVersion', 16)
+-        targetSdkVersion safeExtGet('targetSdkVersion', 28)
++        minSdkVersion safeExtGet('minSdkVersion', 24)
++        targetSdkVersion safeExtGet('targetSdkVersion', 36)
+         versionCode 1
+         versionName "1.0.0"
+     }
+-    lintOptions {
++    lint {
+         abortOnError false
+     }
+ }
+ 
+ repositories {
+     google()
+-    maven {
+-        // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
+-        url "$rootDir/../node_modules/react-native/android"
+-    }
+-    jcenter()
++    mavenCentral()
+ }
+ 
+ dependencies {
+-    compileOnly "com.facebook.react:react-native:${safeExtGet('reactNativeVersion', '+')}"
++    implementation "com.facebook.react:react-android"
+ }
+   
+diff --git a/node_modules/react-native-get-sms-android/android/src/main/AndroidManifest.xml b/node_modules/react-native-get-sms-android/android/src/main/AndroidManifest.xml
+index 3473b6c..a2af051 100644
+--- a/node_modules/react-native-get-sms-android/android/src/main/AndroidManifest.xml
++++ b/node_modules/react-native-get-sms-android/android/src/main/AndroidManifest.xml
+@@ -1,5 +1,4 @@
+ 
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-          package="com.react">
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ </manifest>
+ 
+diff --git a/node_modules/react-native-get-sms-android/android/src/main/java/com/react/SmsPackage.java b/node_modules/react-native-get-sms-android/android/src/main/java/com/react/SmsPackage.java
+index 86bcf3f..364e1f6 100644
+--- a/node_modules/react-native-get-sms-android/android/src/main/java/com/react/SmsPackage.java
++++ b/node_modules/react-native-get-sms-android/android/src/main/java/com/react/SmsPackage.java
+@@ -1,17 +1,13 @@
+ 
+ package com.react;
+ 
+-import android.app.Activity;
+-
+ import com.facebook.react.ReactPackage;
+-import com.facebook.react.bridge.JavaScriptModule;
+ import com.facebook.react.bridge.NativeModule;
+ import com.facebook.react.bridge.ReactApplicationContext;
+ import com.facebook.react.uimanager.ViewManager;
+ 
+ import java.util.ArrayList;
+ import java.util.Arrays;
+-import java.util.Collections;
+ import java.util.List;
+ 
+ 
+@@ -25,10 +21,6 @@ public class SmsPackage implements ReactPackage {
+         return modules;
+     }
+ 
+-    public List<Class<? extends JavaScriptModule>> createJSModules() {
+-        return Collections.emptyList();
+-    }
+-
+     @Override
+     public List<ViewManager> createViewManagers(ReactApplicationContext reactApplicationContext) {
+         return Arrays.<ViewManager>asList();

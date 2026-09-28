@@ -24,7 +24,7 @@ export default function TransactionHistory({ messages }) {
                 {item.merchant || item.sender}
               </Text>
               <Text style={[styles.amount, { color: isDebit ? '#FF3B30' : '#34C759' }]}>
-                {isDebit ? '-' : '+'}₹{item.amount.toLocaleString('en-IN')}
+                {isDebit ? '-' : '+'}₹{Number(item.amount || 0).toLocaleString('en-IN')}
               </Text>
             </View>
             <Text style={styles.body} numberOfLines={2}>
