@@ -1,6 +1,6 @@
 import { useSmsListener } from 'expo-sms-listener';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ControlPanel from '../components/ControlPanel';
 import TransactionHistory from '../components/TransactionHistory';
@@ -31,14 +31,10 @@ export default function Dashboard() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.content}>
         <Text style={styles.text}>Payment Messages</Text>
         <TransactionHistory messages={messages} />
-      </ScrollView>
+      </View>
       <ControlPanel />
     </SafeAreaView>
   );
@@ -46,7 +42,6 @@ export default function Dashboard() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F5F5F7' },
-  scroll: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+  content: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
   text: { color: '#1C1C1E', fontSize: 20, fontWeight: '700', marginBottom: 16 },
 });
