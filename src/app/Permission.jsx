@@ -1,19 +1,22 @@
 import { useRouter } from 'expo-router';
-import { requestSmsPermissionAsync, startSmsListenerServiceAsync, useSmsListener } from 'expo-sms-listener';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { requestReadSms } from '../service/smsReader';
 
 export default function Permission() {
   const router = useRouter();
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState('idle'); // idle | loading | denied | error
   const offset = useRef(new Animated.Value(0)).current;
-
-  // Hook into the SMS stream
-  useSmsListener((msg) => {
-    console.log('Sender:', msg.originatingAddress);
-    console.log('Body:', msg.body);
-  });
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -37,12 +40,36 @@ export default function Permission() {
   }, [offset]);
 
   const handleGrant = async () => {
-    const { granted } = await requestSmsPermissionAsync();
-    if (granted) {
-      await startSmsListenerServiceAsync();
+    if (status === 'loading') return;
+
+    if (Platform.OS !== 'android') {
+      setStatus('error');
+      return;
+    }
+
+    setStatus('loading');
+    try {
+      // 1. Permission to read existing inbox messages
+      const canRead = await requestReadSms();
+      if (!canRead) {
+        setStatus('denied');
+        return;
+      }
+
+      // 2. Live listener for new SMS (loaded lazily so a missing native
+      //    module can't crash this screen)
+      try {
+        const sms = require('expo-sms-listener');
+        const { granted } = await sms.requestSmsPermissionAsync();
+        if (granted) await sms.startSmsListenerServiceAsync();
+      } catch (e) {
+        console.warn('SMS listener unavailable:', e);
+      }
+
       router.replace('/Dashboard');
-    } else {
-      setStatus('denied');
+    } catch (e) {
+      console.warn('Permission error:', e);
+      setStatus('error');
     }
   };
 
@@ -70,11 +97,24 @@ export default function Permission() {
             Permission denied. Tap Grant to try again.
           </Text>
         )}
+        {status === 'error' && (
+          <Text style={styles.error}>
+            Something went wrong. SMS access works on Android only.
+          </Text>
+        )}
       </View>
 
       <View style={styles.bottom}>
-        <Pressable style={styles.button} onPress={handleGrant}>
-          <Text style={styles.buttonText}>Grant permission</Text>
+        <Pressable
+          style={[styles.button, status === 'loading' && { opacity: 0.7 }]}
+          onPress={handleGrant}
+          disabled={status === 'loading'}
+        >
+          {status === 'loading' ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.buttonText}>Grant permission</Text>
+          )}
         </Pressable>
         <Pressable onPress={handleNotNow}>
           <Text style={styles.skipbtn}>Not now</Text>
