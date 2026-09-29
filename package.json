@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/ui": "~57.0.20",
     "@maniac-tech/react-native-expo-read-sms": "^9.1.2",
+    "@react-native-google-signin/google-signin": "^16.1.5",
     "expo": "~57.0.25",
     "expo-checkbox": "~57.0.0",
     "expo-constants": "~57.0.19",
