@@ -36,7 +36,8 @@
           "imageWidth": 76
         }
       ],
-      "expo-sms-listener"
+      "expo-sms-listener",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
