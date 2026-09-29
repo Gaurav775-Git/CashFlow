@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSmsListener } from 'expo-sms-listener';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -39,22 +40,31 @@ export default function Dashboard() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Expense</Text>
-      </View>
+    <View style={styles.screen}>
+      <LinearGradient
+        colors={['#A78BFA', '#F5F5F7']}
+        locations={[0, 0.5]}
+        style={styles.gradient}
+        pointerEvents="none"
+      />
 
-      <View style={styles.panelWrap}>
-        <ControlPanel
-          permissionGranted={permissionGranted}
-          lastScan={lastScan}
-          count={messages.length}
-          onRescan={handleRescan}
-          onClear={handleClear}
-          messages={messages}
-        />
-      </View>
-    </SafeAreaView>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.headerText}>Expense</Text>
+        </View>
+
+        <View style={styles.panelWrap}>
+          <ControlPanel
+            permissionGranted={permissionGranted}
+            lastScan={lastScan}
+            count={messages.length}
+            onRescan={handleRescan}
+            onClear={handleClear}
+            messages={messages}
+          />
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -63,6 +73,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F7',
   },
+  gradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+  },
+  safe: {
+    flex: 1,
+  },
   header: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -70,11 +90,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   headerText: {
-    color: '#1C1C1E',
+    color: '#FFFFFF',
     fontSize: 40,
     fontWeight: '700',
     letterSpacing: 0.3,
-    paddingBottom: 60
+    paddingBottom: 60,
   },
   panelWrap: {
     flex: 1,
