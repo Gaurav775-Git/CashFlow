@@ -1,127 +1,208 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
 
-// ---------- Structured Regex Rules ----------
+// ---------- FILTER ----------
 
-// 1. Exclude explicit OTP patterns safely
-const OTP = /\b(otp|one[- ]time password|verification code|verify\s?your|secret code|two-factor)\b/i;
+const OTP_MARKERS = ['otp', 'one time password', 'verification code'];
+const PROMO_MARKERS = ['offer', 'discount', 'cashback offer', 'win '];
+const PAYMENT_REQUEST_MARKERS = [
+  'has requested', 'payment request', 'collect request',
+  'requesting payment', 'requests rs', 'ignore if already paid',
+];
+const MERCHANT_ACK_MARKERS = ['have received payment'];
+const REMINDER_MARKERS = [
+  'is due', 'min amount due', 'minimum amount due', 'in arrears',
+  'is overdue', 'ignore if paid',
+];
+const TRANSACTION_KEYWORDS = [
+  'debited', 'credited', 'withdrawn', 'withdrawal', 'withdrawing', 'deposited',
+  'spent', 'received', 'transferred', 'paid', 'credit', 'debit',
+];
 
-// 2. Modified Promo: Separated into structural vs aggressive marketing keywords
-const PROMO_WORDS = /\b(win|winner|lucky draw|sale|deal|coupon|loan offer|pre-?approved|apply now|limited period|lottery|prize|instant loan|credit card offer|zero cost emi)\b/i;
+function containsAny(text, markers) {
+  return markers.some((m) => text.includes(m));
+}
 
-// 3. Robust Amount Extraction (Handles spaces, symbols, international decimal variants)
-const AMOUNT = /(?:rs\.?|inr|₹|vpa)\s*([\d,]+(?:\.\d{1,2})?)/i;
+export function isTransactionMessage(body = '') {
+  const lower = body.toLowerCase();
+  if (containsAny(lower, OTP_MARKERS)) return false;
+  if (containsAny(lower, PROMO_MARKERS)) return false;
+  if (containsAny(lower, PAYMENT_REQUEST_MARKERS)) return false;
+  if (containsAny(lower, MERCHANT_ACK_MARKERS)) return false;
+  if (containsAny(lower, REMINDER_MARKERS)) return false;
+  if (lower.includes('pls pay') && lower.includes('min of')) return false;
+  return containsAny(lower, TRANSACTION_KEYWORDS);
+}
 
-// 4. Strong Account Identifiers (Handles tight concatenation like 'A/cX0123' or 'Acct..XX12')
-const ACCOUNT_REF = /\b(a\/c|acct|account|card|vpa|wallet|paytm|wallet)\b.*?\d{2,8}|\b[x*]+\d{4}\b/i;
+// ---------- AMOUNT EXTRACTION ----------
 
-// 5. UPI / Transaction references 
-const UPI_REF = /\b(upi\s*ref|ref\s*no\.?|txn\s*id|transaction\s*id|upi[:/]|utr\s*no\.?)\b/i;
+const BALANCE_CTX = /\b(?:avl\.?\s*bal|available\s*bal(?:ance)?|bal(?:ance)?\s*is)\b\s*(?:rs\.?|inr|₹|usd|aed|eur|gbp|\$)?\s*([\d,]+(?:\.\d{1,2})?)/i;
 
-// 6. Available Balance (The single strongest proof signal of a genuine banking layout)
-const AVL_BAL = /\b(avl\.?\s*bal|available\s*(bal(?:ance)?|limit)|bal\s*is|bal:\s*(?:rs|inr|₹))\b/i;
+// Amount patterns, in priority order. The "debited by X" form is now included.
+const AMOUNT_PATTERNS = [
+  // "debited by 150.00", "credited by 1200", "spent 500", "paid 99.50"
+  /\b(?:debited|credited|spent|paid|withdrawn|deposited|received|sent|transferred)\s*(?:by|of|with|for|rs\.?|inr|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+  // Currency prefix: "Rs.500", "INR 1,200", "₹99"
+  /(?:rs\.?|inr|₹|usd|aed|eur|gbp|\$)\s*([\d,]+(?:\.\d{1,2})?)/i,
+  // Currency suffix: "500 Rs", "1200 INR"
+  /([\d,]+(?:\.\d{1,2})?)\s*(?:rs\.?|inr|₹|usd|aed|eur|gbp|\$)/i,
+];
 
-// 7. Context-Aware Verbs (Bound closely to past-tense events)
-const DEBIT = /\b(debited|debit|dr\.?|spent|withdraw(?:n|al)?|paid|payment\s+of|purchase(?:d)?|sent|deducted|charged|transacted)\b/i;
-const CREDIT = /\b(credited|credit|cr\.?|received|deposit(?:ed)?|refund(?:ed)?)\b/i;
+function extractAmount(body) {
+  let working = body;
+  let balance = null;
 
-// 8. Dynamic Merchant Parser (Captures anything immediately following common conjunction patterns)
-const MERCHANT = /(?:\bto\b|\bat\b|vpa\b|towards\b|spent\s+on\s+|paid\s+to\s+)\s*([A-Za-z0-9][A-Za-z0-9 .&_-]{1,24})/i;
-
-// 9. Legitimate Sender Identification (Indian DLT Framework compliance checking)
-const LOOKS_LIKE_PHONE_NUMBER = /^\+?\d{9,13}\$/;
-const looksLikeBankSender = (address = '') => {
-  const cleanAddr = address.trim();
-  if (LOOKS_LIKE_PHONE_NUMBER.test(cleanAddr)) return false;
-  // Indian Bank transactional headers safely require a hyphenated corporate suffix (e.g., -HDFCBK, -T)
-  return cleanAddr.includes('-') || cleanAddr.length >= 5;
-};
-
-const FINANCE_HINT = /\b(debit|credit|spent|withdraw|paid|payment|purchase|sent|deducted|charged|received|deposit|refund|a\/c|acct|account|upi|bal)\b/i;
-
-export function parseTransaction(sms) {
-  const rawBody = sms.body || '';
-  // Sanitize white space anomalies natively forced by telecom aggregators
-  const body = rawBody.replace(/\s+/g, ' ').trim();
-  const sender = sms.address || '';
-
-  // Step 1: Drop OTP strings immediately
-  if (OTP.test(body)) return null;
-
-  // Step 2: Amount Validation (Crucial gatekeeper step)
-  const amountMatch = body.match(AMOUNT);
-  if (!amountMatch) return null;
-
-  // Step 3: Hard Structural Proof Checks
-  // A transaction must include an account reference, UPI track record, or a balance confirmation
-  const hasProof = ACCOUNT_REF.test(body) || UPI_REF.test(body) || AVL_BAL.test(body);
-  if (!hasProof) return null;
-
-  // Step 4: Strict Action Classification
-  const debitMatch = body.match(DEBIT);
-  const creditMatch = body.match(CREDIT);
-  if (!debitMatch && !creditMatch) return null;
-
-  // Step 5: Advanced Promo Filtering 
-  // If it matches promo terms, ensure it's not a legitimate transactional statement (e.g. Cashback)
-  if (PROMO_WORDS.test(body)) {
-    const cashBackContext = /\b(cashback\s+(received|credited)|credited\s+back)\b/i.test(body);
-    if (!cashBackContext) return null; // Reject if it's pure marketing spam
+  const balMatch = working.match(BALANCE_CTX);
+  if (balMatch) {
+    balance = Number(balMatch[1].replace(/,/g, ''));
+    working =
+      working.slice(0, balMatch.index) +
+      ' '.repeat(balMatch[0].length) +
+      working.slice(balMatch.index + balMatch[0].length);
   }
 
-  // Determine actual action chronology to prevent double match collisions
+  for (const pattern of AMOUNT_PATTERNS) {
+    const m = working.match(pattern);
+    if (m) return { amount: Number(m[1].replace(/,/g, '')), balance };
+  }
+  return { amount: null, balance };
+}
+
+// ---------- MERCHANT EXTRACTION ----------
+
+// Added "trf to" and "transfer to" before plain "to"
+const MERCHANT_PATTERNS = [
+  /\b(?:trf\s+to|transfer(?:red)?\s+to|paid\s+to|spent\s+on|sent\s+to|towards)\s+([A-Za-z][A-Za-z0-9 .&_@/-]{1,32})/i,
+  /\b(?:to|at|from)\s+([A-Za-z][A-Za-z0-9 .&_@/-]{1,32})/i,
+  /\bto\s+([A-Za-z0-9._-]+@[A-Za-z]+)/i,
+];
+
+function extractMerchant(body) {
+  for (const pattern of MERCHANT_PATTERNS) {
+    const m = body.match(pattern);
+    if (m && m[1]) {
+      let merchant = m[1]
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/[.,;:]+$/, '');
+      merchant = merchant
+        .replace(
+          /\b(ending|using|linked|ref|reference|refno|bal|balance|on|dt|dated|if not|call|for other)\b.*/i,
+          ''
+        )
+        .trim();
+      if (merchant.length >= 2) return merchant;
+    }
+  }
+  return null;
+}
+
+// ---------- REFERENCE / ACCOUNT ----------
+
+// Added "refno" (one word) alongside "ref no"
+const UPI_REF = /\b(?:upi\s*ref(?:no)?|ref(?:erence)?\s*(?:no|number|#)?|refno|rrn|txn\s*id|transaction\s*id|utr\s*no)\b\s*[:.#-]?\s*([A-Z0-9]{6,})/i;
+
+const ACCOUNT_REF = /\b(?:a\/c|acct|account|card|vpa|wallet)\s*(?:no\.?|number)?[:.]?\s*[x*\d]+[\d]{2,8}\b|\b[x*]{2,}\d{2,4}\b/i;
+
+// ---------- DATE EXTRACTION ----------
+
+// Handles: "28Sep26", "28 Sep 26", "28-Sep-2026", "28/09/26", "2026-09-28"
+const DATE_PATTERNS = [
+  /\b(\d{1,2})[-\s]?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-\s]?(\d{2,4})\b/i,
+  /\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\b/,
+  /\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/,
+];
+
+const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+
+function extractDate(body, fallbackTs) {
+  // Named-month formats: "28Sep26", "28 Sep 2026"
+  const namedMatch = body.match(DATE_PATTERNS[0]);
+  if (namedMatch) {
+    const day = Number(namedMatch[1]);
+    const month = MONTHS.indexOf(namedMatch[2].toLowerCase().slice(0, 3));
+    let year = Number(namedMatch[3]);
+    if (year < 100) year += 2000;
+    if (month >= 0 && day >= 1 && day <= 31) {
+      return new Date(year, month, day).getTime();
+    }
+  }
+
+  // Numeric d/m/y: "28/09/26"
+  const dmyMatch = body.match(DATE_PATTERNS[1]);
+  if (dmyMatch) {
+    let day = Number(dmyMatch[1]);
+    let month = Number(dmyMatch[2]) - 1;
+    let year = Number(dmyMatch[3]);
+    if (year < 100) year += 2000;
+    // If day > 12 and month <= 12, likely already d/m/y
+    if (day > 12 && month + 1 <= 12) {
+      return new Date(year, month, day).getTime();
+    }
+    // Fallback: assume d/m/y for Indian bank SMS
+    if (day <= 31 && month >= 0 && month <= 11) {
+      return new Date(year, month, day).getTime();
+    }
+  }
+
+  // Numeric y/m/d: "2026-09-28"
+  const ymdMatch = body.match(DATE_PATTERNS[2]);
+  if (ymdMatch) {
+    const year = Number(ymdMatch[1]);
+    const month = Number(ymdMatch[2]) - 1;
+    const day = Number(ymdMatch[3]);
+    return new Date(year, month, day).getTime();
+  }
+
+  return fallbackTs;
+}
+
+// ---------- PARSER ----------
+
+export function parseTransaction(sms) {
+  const body = (sms.body || '').replace(/\s+/g, ' ').trim();
+  const sender = sms.address || '';
+
+  if (!isTransactionMessage(body)) return null;
+
+  const { amount, balance } = extractAmount(body);
+  if (!amount || amount <= 0) return null;
+
+  const refMatch = body.match(UPI_REF);
+  const hasProof = ACCOUNT_REF.test(body) || balance !== null || !!refMatch;
+  if (!hasProof) return null;
+
+  const debitIdx = body.search(/\b(debited|spent|withdrawn|paid|sent|deducted|charged|trf)\b/i);
+  const creditIdx = body.search(/\b(credited|received|deposited|refunded)\b/i);
   let type = 'debit';
-  if (debitMatch && creditMatch) {
-    type = debitMatch.index <= creditMatch.index ? 'debit' : 'credit';
-  } else if (creditMatch) {
+  if (debitIdx !== -1 && creditIdx !== -1) {
+    type = debitIdx <= creditIdx ? 'debit' : 'credit';
+  } else if (creditIdx !== -1) {
     type = 'credit';
   }
 
-  // Step 6: Smart Merchant Extraction
-  let merchant = null;
-  const merchantMatch = body.match(MERCHANT);
-  if (merchantMatch && merchantMatch[1]) {
-    const rawMerchant = merchantMatch[1].trim();
-    // Strip redundant standard bank string noise or terminal boundaries
-    merchant = rawMerchant.replace(/\b(ending|using|linked|ref|for|on|bal|is)\b.*/i, '').trim();
-    if (merchant.length < 2) merchant = null;
-  }
-
   return {
-    id: String(sms._id ?? `${sender}-${sms.date}`),
+    id: String(sms._id ?? `${sender}-${sms.date ?? Date.now()}`),
     sender,
     body,
-    date: Number(sms.date) || Date.now(),
-    amount: Number(amountMatch[1].replace(/,/g, '')),
+    date: extractDate(body, Number(sms.date) || Date.now()),
+    amount,
+    balance,
     type,
-    merchant,
-    likelyBank: looksLikeBankSender(sender),
+    merchant: extractMerchant(body),
+    reference: refMatch ? refMatch[1] : null,
   };
 }
 
-// Keep your existing permission and debug frameworks intact...
-export function debugSms(body) {
-  console.log('--- SMS DEBUG ---');
-  console.log('body:', body);
-  console.log('is OTP:', OTP.test(body));
-  console.log('is PROMO:', PROMO_WORDS.test(body));
-  const amountMatch = body.match(AMOUNT);
-  console.log('has AMOUNT:', !!amountMatch, amountMatch?.[0]);
-  console.log('has ACCOUNT_REF:', ACCOUNT_REF.test(body));
-  console.log('has UPI_REF:', UPI_REF.test(body));
-  console.log('has AVL_BAL:', AVL_BAL.test(body));
-  const debitMatch = body.match(DEBIT);
-  const creditMatch = body.match(CREDIT);
-  console.log('DEBIT match:', debitMatch?.[0] ?? 'none');
-  console.log('CREDIT match:', creditMatch?.[0] ?? 'none');
-  console.log('-----------------');
-}
+// ---------- PERMISSIONS ----------
 
 export async function requestReadSms() {
   if (Platform.OS !== 'android') return false;
   const res = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.READ_SMS);
   return res === PermissionsAndroid.RESULTS.GRANTED;
 }
+
+// ---------- INBOX ----------
 
 function listInboxRaw({ days = 90, maxCount = 1000 } = {}) {
   const filter = {
@@ -149,39 +230,18 @@ export async function fetchInboxMessages({ days = 90, maxCount = 1000 } = {}) {
   const list = await listInboxRaw({ days, maxCount });
   const parsed = list.map(parseTransaction).filter(Boolean);
 
-  const debitCount = parsed.filter((t) => t.type === 'debit').length;
-  const creditCount = parsed.filter((t) => t.type === 'credit').length;
-  console.log(`SMS scan: ${list.length} in inbox, ${parsed.length} matched (${debitCount} debit, ${creditCount} credit)`);
-
-  return parsed.sort((a, b) => b.date - a.date);
-}
-
-export async function scanRejectedFinanceMessages({ days = 90, maxCount = 1000 } = {}) {
-  if (Platform.OS !== 'android') return;
-  const allowed = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_SMS);
-  if (!allowed && !(await requestReadSms())) return;
-
-  const list = await listInboxRaw({ days, maxCount });
-  let shown = 0;
-
-  for (const sms of list) {
-    const body = (sms.body || '').trim();
-    if (!FINANCE_HINT.test(body)) continue; 
-    const result = parseTransaction(sms);
-    if (result) continue; 
-
-    if (shown >= 15) break; 
-    shown++;
-    console.log(`\n--- REJECTED #${shown} (sender: ${sms.address}) ---`);
-    console.log(body);
-    console.log(
-      'reasons ->',
-      OTP.test(body) ? 'OTP ' : '',
-      PROMO_WORDS.test(body) ? 'PROMO ' : '',
-      !AMOUNT.test(body) ? 'NO_AMOUNT ' : '',
-      !(ACCOUNT_REF.test(body) || UPI_REF.test(body) || AVL_BAL.test(body)) ? 'NO_PROOF ' : '',
-      !(DEBIT.test(body) || CREDIT.test(body)) ? 'NO_VERB ' : ''
-    );
+  const seen = new Set();
+  const unique = [];
+  for (const tx of parsed) {
+    const key = `${tx.sender}|${tx.amount}|${tx.type}|${Math.floor(tx.date / 60000)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(tx);
   }
-  console.log(`\nDone. ${shown} rejected finance-shaped messages shown.`);
+
+  console.log(
+    `SMS scan: ${list.length} inbox, ${parsed.length} matched, ${unique.length} unique`
+  );
+
+  return unique.sort((a, b) => b.date - a.date);
 }
