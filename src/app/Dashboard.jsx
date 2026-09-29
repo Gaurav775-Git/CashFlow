@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   headerText: {
-    color: '#FFFFFF',
+    color: '#black',
     fontSize: 40,
     fontWeight: '700',
     letterSpacing: 0.3,
