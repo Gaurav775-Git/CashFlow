@@ -4,14 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ControlPanel from '../components/ControlPanel';
-import { sumCredits, sumDebits, sumSavings } from '../components/TransactionHistory';
 import { fetchInboxMessages, parseTransaction } from '../service/smsReader';
 
 export default function Dashboard() {
   const [messages, setMessages] = useState([]);
   const [lastScan, setLastScan] = useState(null);
   const [permissionGranted, setPermissionGranted] = useState(true);
-  const [budget, setBudget] = useState(0);
 
   const loadMessages = useCallback(async () => {
     const data = await fetchInboxMessages();
@@ -19,21 +17,10 @@ export default function Dashboard() {
     setLastScan(new Date());
   }, []);
 
-  // Initial load
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
 
-  // Auto-refresh every 60 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadMessages();
-    }, 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [loadMessages]);
-
-  // Live SMS listener
   useSmsListener((msg) => {
     const tx = parseTransaction({
       _id: `${msg.originatingAddress}-${Date.now()}`,
@@ -44,9 +31,13 @@ export default function Dashboard() {
     if (tx) setMessages((prev) => [tx, ...prev]);
   });
 
-  const totalSpent = sumDebits(messages);
-  const totalIncome = sumCredits(messages);
-  const totalSavings = sumSavings(messages);
+  const handleRescan = () => {
+    loadMessages();
+  };
+
+  const handleClear = () => {
+    setMessages([]);
+  };
 
   return (
     <View style={styles.screen}>
@@ -59,18 +50,17 @@ export default function Dashboard() {
 
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <Text style={styles.spentLabel}>TOTAL SPENT</Text>
-          <Text style={styles.spentAmount}>
-            ₹{totalSpent.toLocaleString('en-IN')}
-          </Text>
+          <Text style={styles.headerText}>Expense</Text>
         </View>
 
         <View style={styles.panelWrap}>
           <ControlPanel
+            permissionGranted={permissionGranted}
+            lastScan={lastScan}
+            count={messages.length}
+            onRescan={handleRescan}
+            onClear={handleClear}
             messages={messages}
-            income={totalIncome}
-            savings={totalSavings}
-            budget={budget}
           />
         </View>
       </SafeAreaView>
@@ -96,22 +86,15 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 60,
-    paddingBottom: 30,
+    paddingTop: 100,
+    paddingBottom: 20,
   },
-  spentLabel: {
-    color: '#1C1C1E',
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 1.4,
-    opacity: 0.85,
-    marginBottom: 8,
-  },
-  spentAmount: {
-    color: '#1C1C1E',
-    fontSize: 44,
+  headerText: {
+    color: '#black',
+    fontSize: 40,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: 0.3,
+    paddingBottom: 60,
   },
   panelWrap: {
     flex: 1,
