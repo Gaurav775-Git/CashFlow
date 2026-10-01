@@ -19,10 +19,21 @@ export default function Dashboard() {
     setLastScan(new Date());
   }, []);
 
+  // Initial load
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
 
+  // Auto-refresh every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadMessages();
+    }, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [loadMessages]);
+
+  // Live SMS listener
   useSmsListener((msg) => {
     const tx = parseTransaction({
       _id: `${msg.originatingAddress}-${Date.now()}`,
@@ -32,14 +43,6 @@ export default function Dashboard() {
     });
     if (tx) setMessages((prev) => [tx, ...prev]);
   });
-
-  const handleRescan = () => {
-    loadMessages();
-  };
-
-  const handleClear = () => {
-    setMessages([]);
-  };
 
   const totalSpent = sumDebits(messages);
   const totalIncome = sumCredits(messages);
@@ -64,11 +67,6 @@ export default function Dashboard() {
 
         <View style={styles.panelWrap}>
           <ControlPanel
-            permissionGranted={permissionGranted}
-            lastScan={lastScan}
-            count={messages.length}
-            onRescan={handleRescan}
-            onClear={handleClear}
             messages={messages}
             income={totalIncome}
             savings={totalSavings}
