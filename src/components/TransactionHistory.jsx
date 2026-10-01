@@ -1,5 +1,47 @@
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
+// ---------- HELPERS ----------
+
+const CREDIT_KEYWORDS = ['credited', 'received', 'deposited', 'refund', 'refunded'];
+const DEBIT_KEYWORDS = ['debited', 'spent', 'withdrawn', 'paid', 'deducted', 'charged'];
+
+function extractAmountFromBody(body = '') {
+  const patterns = [
+    /(?:rs\.?|inr|₹|usd|aed|eur|gbp|\$)\s*([\d,]+(?:\.\d{1,2})?)/i,
+    /([\d,]+(?:\.\d{1,2})?)\s*(?:rs\.?|inr|₹|usd|aed|eur|gbp|\$)/i,
+    /\b(?:credited|received|deposited|refunded|debited|spent|paid|withdrawn|deducted|charged)\s*(?:by|with|of|for)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+  ];
+  for (const p of patterns) {
+    const m = body.match(p);
+    if (m) return Number(m[1].replace(/,/g, ''));
+  }
+  return 0;
+}
+
+export function sumCredits(messages = []) {
+  return messages
+    .filter((m) => {
+      const body = (m.body || '').toLowerCase();
+      return CREDIT_KEYWORDS.some((kw) => body.includes(kw));
+    })
+    .reduce((sum, m) => sum + extractAmountFromBody(m.body), 0);
+}
+
+export function sumDebits(messages = []) {
+  return messages
+    .filter((m) => {
+      const body = (m.body || '').toLowerCase();
+      return DEBIT_KEYWORDS.some((kw) => body.includes(kw));
+    })
+    .reduce((sum, m) => sum + extractAmountFromBody(m.body), 0);
+}
+
+export function sumSavings(messages = []) {
+  return sumCredits(messages) - sumDebits(messages);
+}
+
+// ---------- COMPONENT ----------
+
 export default function TransactionHistory({ messages }) {
   if (!messages || messages.length === 0) {
     return (
