@@ -66,7 +66,7 @@ export default function Permission() {
         console.warn('SMS listener unavailable:', e);
       }
 
-      router.replace('/Dashboard');
+      router.replace('/(tabs)');
     } catch (e) {
       console.warn('Permission error:', e);
       setStatus('error');
@@ -74,7 +74,7 @@ export default function Permission() {
   };
 
   const handleNotNow = () => {
-    router.replace('/Dashboard');
+    router.replace('/(tabs)');
   };
 
   return (
