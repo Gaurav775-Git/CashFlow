@@ -3,9 +3,9 @@ import { useSmsListener } from 'expo-sms-listener';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ControlPanel from '../components/ControlPanel';
-import { sumCredits, sumDebits, sumSavings } from '../components/TransactionHistory';
-import { fetchInboxMessages, parseTransaction } from '../service/smsReader';
+import ControlPanel from '../../components/ControlPanel'
+import { sumCredits, sumDebits, sumSavings } from '../../components/TransactionHistory';
+import { fetchInboxMessages, parseTransaction } from '../../service/smsReader';
 
 export default function Dashboard() {
   const [messages, setMessages] = useState([]);
