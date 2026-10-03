@@ -5,16 +5,16 @@ import {
 } from "@react-native-google-signin/google-signin";
 
 GoogleSignin.configure({
-  webClientId:
-    "221110291379-rdoi51n54ugnor8pp07tsj9v2lqpjic1.apps.googleusercontent.com",
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
 });
 
-const signin = async () => {
+const signIn = async () => {
   try {
     await GoogleSignin.hasPlayServices();
     const response = await GoogleSignin.signIn();
     if (isSuccessResponse(response)) {
       console.log(response);
+      return response;
     } else {
       console.log("signin was cancelled by the user");
     }
@@ -31,4 +31,16 @@ const signin = async () => {
   }
 };
 
-export default signin;
+const signOut = async()=>{
+  try {
+    await GoogleSignin.signOut();
+    console.log("Sign out successful");
+    return true;
+
+  } catch (error) {
+    console.log("Google Sign-Out error:", error);
+    return false;
+  }
+}
+
+export default {signIn,signOut};
