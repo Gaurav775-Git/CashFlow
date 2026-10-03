@@ -43,4 +43,4 @@ const signOut = async()=>{
   }
 }
 
-export default {signIn,signOut};
+export default signIn;
