@@ -8,7 +8,7 @@ export default function Splash() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.replace('/Onboarding');
+      router.replace('/(tabs)');
     }, 3000);
 
     return () => clearTimeout(timer);
