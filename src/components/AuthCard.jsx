@@ -1,11 +1,20 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import signin from "../service/googleAuth";
+import signIn from "../service/googleAuth.js";
 
 export default function AuthCard() {
   const [agreed, setAgreed] = useState(false);
   const router = useRouter();
+
+  const handleGoogleLogIn = async () => {
+    const response = await signIn();
+    if (response) {
+      console.log("Logged in user:", response);
+
+      router.replace("/Permission");
+    }
+  };
 
   return (
     <View style={styles.card}>
@@ -20,8 +29,13 @@ export default function AuthCard() {
         </Text>
       </Pressable>
 
-      <Pressable style={styles.googleBtn} onPress={signin}>
-      <Text style={styles.buttonText}>sign in with google</Text></Pressable>
+      <Pressable
+        style={[styles.googleBtn, !agreed && styles.buttonDisabled]}
+        disabled={!agreed}
+        onPress={handleGoogleLogIn}
+      >
+        <Text style={styles.buttonText}>sign in with google</Text>
+      </Pressable>
 
       <Pressable
         style={[styles.button, !agreed && styles.buttonDisabled]}
@@ -105,11 +119,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   googleBtn: {
-   width: 212,
-  height: 48,
-  backgroundColor: "#050505",
-  alignItems: "center",
-  paddingVertical: 12,
-  borderRadius: 100,
+    paddingVertical: 12,
+    borderRadius: 100,
+    alignItems: "center",
+    backgroundColor: "#050505",
   },
 });
